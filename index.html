@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>FFMPEG VIDEO CONVERTER</title>
+    <script src="ffmpegWasmBarebones.js"></script>
+    <style>
+        * { box-sizing: border-box; border-radius: 0 !important; }
+        body { font-family: "Segoe UI", sans-serif; background: #0a0a0a; color: #eee; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .panel { width: 100%; max-width: 800px; border: 1px solid #333; background: #111; padding: 40px; }
+        h2 { text-transform: uppercase; font-weight: 300; border-left: 4px solid #fff; padding-left: 15px; font-size: 1.1em; margin-bottom: 20px; }
+        
+        .input-group { margin-bottom: 20px; }
+        label { display: block; font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 5px; }
+        #cmd-input { width: 100%; background: #000; border: 1px solid #333; color: #0f0; padding: 12px; font-family: monospace; font-size: 13px; outline: none; }
+        #cmd-input:focus { border-color: #555; }
+
+        .info-box { background: #000; border: 1px solid #222; padding: 15px; margin-bottom: 20px; font-family: monospace; font-size: 12px; color: #888; }
+        #progress { font-size: 24px; font-weight: bold; text-transform: uppercase; margin: 20px 0; color: #fff; }
+        .btn-main { background: #fff; color: #000; border: none; padding: 15px; width: 100%; font-weight: bold; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
+        .btn-main:hover { background: #ccc; }
+        
+        #log-container { margin-top: 20px; height: 220px; background: #050505; border: 1px solid #222; padding: 10px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 11px; color: #777; line-height: 1.4; }
+        .log-entry { border-bottom: 1px solid #111; padding: 2px 0; white-space: pre-wrap; word-break: break-all; }
+        .log-error { color: #ff5555; }
+        .log-success { color: #55ff55; }
+    </style>
+</head>
+<body>
+
+<div class="panel">
+    <h2>Video Transcoder Console</h2>
+    
+    <div class="input-group">
+        <label>Enter FFmpeg Conversion Command</label>
+        <input type="text" id="cmd-input" placeholder="ffmpeg -i input.mp4 output.mkv">
+    </div>
+
+    <div id="progress">Ready</div>
+    
+    <div class="info-box">
+        STATUS: <span id="status-tag">Awaiting File System Access</span>
+    </div>
+
+    <button class="btn-main" id="start-btn">Authorize & Convert</button>
+    
+    <div id="log-container">
+        <div class="log-entry">Waiting for command...</div>
+    </div>
+</div>
+
+<script>
+    const FFMPEG_CORE_URL = document.location.origin + document.location.pathname + "./ffmpeg-core/ffmpeg-core.js";
+    const FFMPEG_WASM_URL = document.location.origin + document.location.pathname + "./ffmpeg-core/ffmpeg-core.wasm";
+    
+    let ffmpegCoreAPI = undefined;
+    const logContainer = document.getElementById('log-container');
+
+    const appendLog = (message, type = 'info') => {
+        const el = document.createElement('div');
+        el.className = `log-entry ${type === 'error' ? 'log-error' : (type === 'success' ? 'log-success' : '')}`;
+        el.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logContainer.appendChild(el);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    };
+
+    const parseCommand = (cmd) => {
+        const parts = cmd.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
+        return parts.map(p => p.replace(/^["']|["']$/g, '')).filter(p => p !== 'ffmpeg');
+    };
+
+    document.getElementById('start-btn').onclick = async () => {
+        const cmdValue = document.getElementById('cmd-input').value.trim();
+        if (!cmdValue) return alert("Please enter a command.");
+
+        try {
+            const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            document.getElementById('status-tag').textContent = "Directory Authorized";
+            document.getElementById('progress').textContent = "Initializing WASM";
+
+            if (!ffmpegCoreAPI) {
+                ffmpegCoreAPI = await loadFFmpegCoreAPI({
+                    coreURL: FFMPEG_CORE_URL,
+                    wasmURL: FFMPEG_WASM_URL,
+                    onLog: (l) => appendLog(l.message),
+                    onProgress: (p) => {
+                        document.getElementById('progress').textContent = `Progress: ${(p.progress * 100).toFixed(1)}%`;
+                    }
+                });
+            }
+
+            const args = parseCommand(cmdValue);
+            
+            for (const arg of args) {
+                if (arg.includes('.') && !arg.startsWith('-')) {
+                    try {
+                        const fileHandle = await dirHandle.getFileHandle(arg);
+                        const file = await fileHandle.getFile();
+                        const buffer = await file.arrayBuffer();
+                        await ffmpegCoreAPI("FS.writeFile", [arg, new Uint8Array(buffer)]);
+                        appendLog(`File Mounted: ${arg}`);
+                    } catch (e) {
+                        // Probably the output filename
+                    }
+                }
+            }
+
+            document.getElementById('progress').textContent = "Processing...";
+            await ffmpegCoreAPI("setTimeout", [-1]);
+            await ffmpegCoreAPI("exec", args);
+            
+            const result = await ffmpegCoreAPI("ret");
+            if (result === 0) {
+                document.getElementById('progress').textContent = "Saving to Disk";
+                const fsFiles = await ffmpegCoreAPI("FS.readdir", ["/"]);
+                
+                for (const f of fsFiles) {
+                    if (["current_dir", ".", "..", "tmp", "dev", "proc"].includes(f)) continue;
+                    
+                    const isInput = args.some((arg, i) => arg === f && (i === 0 || args[i-1] === '-i'));
+                    
+                    if (!isInput) {
+                        try {
+                            const data = await ffmpegCoreAPI("FS.readFile", [f]);
+                            const newFileHandle = await dirHandle.getFileHandle(f, { create: true });
+                            const writable = await newFileHandle.createWritable();
+                            await writable.write(data.buffer);
+                            await writable.close();
+                            appendLog(`Successfully Saved: ${f}`, 'success');
+                            await ffmpegCoreAPI("FS.unlink", [f]);
+                        } catch (e) {
+                            console.log(`Skipping system object: ${f}`);
+                        }
+                    }
+                }
+                document.getElementById('progress').textContent = "Finished";
+                appendLog("Transcoding complete.", 'success');
+            } else {
+                document.getElementById('progress').textContent = "Failed";
+                appendLog(`Error during transcoding. Code: ${result}`, 'error');
+            }
+            
+            await ffmpegCoreAPI("reset");
+
+        } catch (err) {
+            appendLog(`System Error: ${err.message}`, 'error');
+            document.getElementById('progress').textContent = "Stopped";
+        }
+    };
+</script>
+</body>
+</html>
