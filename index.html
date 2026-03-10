@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FFMPEG</title>
+    <title>FFmpeg</title>
     <script src="ffmpegWasmBarebones.js"></script>
     <style>
         :root {
@@ -45,7 +45,7 @@
             <span>FS: <span id="status-tag" style="color: #666;">OFFLINE</span></span>
             <span id="progress-text">IDLE</span>
         </div>
-        <button id="auth-btn" class="btn-main btn-secondary">Mount Local Directory</button>
+        <button id="auth-btn" class="btn-main btn-secondary">挂载系统目录</button>
     </div>
 
     <div class="card">
@@ -55,7 +55,7 @@
 
     <div class="card">
         <span class="label">Step 03 / Terminal</span>
-        <button id="start-btn" class="btn-main" disabled>Execute Transcode</button>
+        <button id="start-btn" class="btn-main" disabled>执行运行命令</button>
         <div id="log-container"></div>
     </div>
 </div>
@@ -93,7 +93,7 @@
     (async function initSystem() {
         try {
             dom.progress.textContent = "CORE_LOADING";
-            appendLog("Initializing FFmpeg WASM Core...");
+            appendLog("初始化 FFmpeg WASM 核心中...");
             
             ffmpegCoreAPI = await loadFFmpegCoreAPI({
                 coreURL: FFMPEG_CORE_URL,
@@ -106,7 +106,7 @@
 
             isCoreLoaded = true;
             dom.progress.textContent = "READY";
-            appendLog("Core loaded successfully.", "success");
+            appendLog("核心加载成功.", "success");
             if (directoryHandle) dom.start.disabled = false;
         } catch (err) {
             appendLog(`Core Init Failed: ${err.message}`, "error");
@@ -120,7 +120,7 @@
             dom.status.textContent = `ONLINE / ${directoryHandle.name.toUpperCase()}`;
             dom.status.style.color = "var(--cmd-text)";
             if (isCoreLoaded) dom.start.disabled = false;
-            appendLog(`Directory "${directoryHandle.name}" mounted.`);
+            appendLog(`目录"${directoryHandle.name}" 已挂载.`);
         } catch (err) {
             appendLog("Mount failed.", "error");
         }
