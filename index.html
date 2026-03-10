@@ -1,51 +1,62 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-cn">
 <head>
     <meta charset="utf-8">
-    <title>FFMPEG VIDEO CONVERTER</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FFMPEG</title>
     <script src="ffmpegWasmBarebones.js"></script>
     <style>
-        * { box-sizing: border-box; border-radius: 0 !important; }
-        body { font-family: "Segoe UI", sans-serif; background: #0a0a0a; color: #eee; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .panel { width: 100%; max-width: 800px; border: 1px solid #333; background: #111; padding: 40px; }
-        h2 { text-transform: uppercase; font-weight: 300; border-left: 4px solid #fff; padding-left: 15px; font-size: 1.1em; margin-bottom: 20px; }
-        
-        .input-group { margin-bottom: 20px; }
-        label { display: block; font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 5px; }
-        #cmd-input { width: 100%; background: #000; border: 1px solid #333; color: #0f0; padding: 12px; font-family: monospace; font-size: 13px; outline: none; }
-        #cmd-input:focus { border-color: #555; }
-
-        .info-box { background: #000; border: 1px solid #222; padding: 15px; margin-bottom: 20px; font-family: monospace; font-size: 12px; color: #888; }
-        #progress { font-size: 24px; font-weight: bold; text-transform: uppercase; margin: 20px 0; color: #fff; }
-        .btn-main { background: #fff; color: #000; border: none; padding: 15px; width: 100%; font-weight: bold; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
-        .btn-main:hover { background: #ccc; }
-        
-        #log-container { margin-top: 20px; height: 220px; background: #050505; border: 1px solid #222; padding: 10px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 11px; color: #777; line-height: 1.4; }
-        .log-entry { border-bottom: 1px solid #111; padding: 2px 0; white-space: pre-wrap; word-break: break-all; }
-        .log-error { color: #ff5555; }
+        :root {
+            --bg: #050505;
+            --card: #0f0f0f;
+            --accent: #ffffff; 
+            --text: #e0e0e0;
+            --dim: #666666;
+            --border: #222222;
+            --cmd-text: #00ff00;
+            --mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; border-radius: 0 !important; }
+        body { background-color: var(--bg); color: var(--text); font-family: var(--mono); margin: 0; padding: 20px; display: flex; justify-content: center; min-height: 100vh; }
+        .app-container { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 15px; }
+        .card { background-color: var(--card); border: 1px solid var(--border); padding: 24px; position: relative; }
+        .label { font-size: 10px; color: var(--dim); margin-bottom: 15px; display: block; letter-spacing: 2px; text-transform: uppercase; border-left: 2px solid var(--accent); padding-left: 10px; }
+        .status-box { font-size: 11px; color: var(--accent); padding: 12px; background: #000; border: 1px solid var(--border); margin-bottom: 10px; display: flex; justify-content: space-between; }
+        #cmd-input { width: 100%; background: #000; color: var(--cmd-text); border: 1px solid var(--border); padding: 15px; font-family: var(--mono); font-size: 14px; outline: none; }
+        .btn-main { width: 100%; background: var(--accent); color: #000; border: none; padding: 18px; cursor: pointer; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; transition: all 0.2s; }
+        .btn-main:hover { filter: brightness(1.1); }
+        .btn-main:disabled { background: var(--dim); cursor: not-allowed; }
+        .btn-secondary { padding: 10px; font-size: 11px; }
+        #log-container { margin-top: 10px; height: 220px; background: #000; border: 1px solid var(--border); padding: 12px; overflow-y: auto; font-size: 11px; color: #888; line-height: 1.6; }
+        .log-entry { border-bottom: 1px solid #111; padding: 4px 0; word-break: break-all; white-space: pre-wrap; }
         .log-success { color: #55ff55; }
+        .log-error { color: #ff4444; }
+        #log-container::-webkit-scrollbar { width: 6px; }
+        #log-container::-webkit-scrollbar-track { background: #000; }
+        #log-container::-webkit-scrollbar-thumb { background: var(--border); }
     </style>
 </head>
 <body>
 
-<div class="panel">
-    <h2>Video Transcoder Console</h2>
-    
-    <div class="input-group">
-        <label>Enter FFmpeg Conversion Command</label>
-        <input type="text" id="cmd-input" placeholder="ffmpeg -i input.mp4 output.mkv">
+<div class="app-container">
+    <div class="card">
+        <span class="label">Step 01 / File System</span>
+        <div class="status-box">
+            <span>FS: <span id="status-tag" style="color: #666;">OFFLINE</span></span>
+            <span id="progress-text">IDLE</span>
+        </div>
+        <button id="auth-btn" class="btn-main btn-secondary">Mount Local Directory</button>
     </div>
 
-    <div id="progress">Ready</div>
-    
-    <div class="info-box">
-        STATUS: <span id="status-tag">Awaiting File System Access</span>
+    <div class="card">
+        <span class="label">Step 02 / Command</span>
+        <input type="text" id="cmd-input" spellcheck="false" value="ffmpeg -i input.mp4 output.mkv">
     </div>
 
-    <button class="btn-main" id="start-btn">Authorize & Convert</button>
-    
-    <div id="log-container">
-        <div class="log-entry">Waiting for command...</div>
+    <div class="card">
+        <span class="label">Step 03 / Terminal</span>
+        <button id="start-btn" class="btn-main" disabled>Execute Transcode</button>
+        <div id="log-container"></div>
     </div>
 </div>
 
@@ -54,14 +65,24 @@
     const FFMPEG_WASM_URL = document.location.origin + document.location.pathname + "./ffmpeg-core/ffmpeg-core.wasm";
     
     let ffmpegCoreAPI = undefined;
-    const logContainer = document.getElementById('log-container');
+    let directoryHandle = null;
+    let isCoreLoaded = false;
 
-    const appendLog = (message, type = 'info') => {
+    const dom = {
+        auth: document.getElementById('auth-btn'),
+        start: document.getElementById('start-btn'),
+        status: document.getElementById('status-tag'),
+        progress: document.getElementById('progress-text'),
+        cmd: document.getElementById('cmd-input'),
+        logs: document.getElementById('log-container')
+    };
+
+    const appendLog = (msg, type = 'info') => {
         const el = document.createElement('div');
         el.className = `log-entry ${type === 'error' ? 'log-error' : (type === 'success' ? 'log-success' : '')}`;
-        el.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-        logContainer.appendChild(el);
-        logContainer.scrollTop = logContainer.scrollHeight;
+        el.textContent = `[${new Date().toLocaleTimeString()}] > ${msg}`;
+        dom.logs.appendChild(el);
+        dom.logs.scrollTop = dom.logs.scrollHeight;
     };
 
     const parseCommand = (cmd) => {
@@ -69,82 +90,114 @@
         return parts.map(p => p.replace(/^["']|["']$/g, '')).filter(p => p !== 'ffmpeg');
     };
 
-    document.getElementById('start-btn').onclick = async () => {
-        const cmdValue = document.getElementById('cmd-input').value.trim();
-        if (!cmdValue) return alert("Please enter a command.");
-
+    (async function initSystem() {
         try {
-            const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            document.getElementById('status-tag').textContent = "Directory Authorized";
-            document.getElementById('progress').textContent = "Initializing WASM";
+            dom.progress.textContent = "CORE_LOADING";
+            appendLog("Initializing FFmpeg WASM Core...");
+            
+            ffmpegCoreAPI = await loadFFmpegCoreAPI({
+                coreURL: FFMPEG_CORE_URL,
+                wasmURL: FFMPEG_WASM_URL,
+                onLog: (l) => appendLog(l.message),
+                onProgress: (p) => {
+                    dom.progress.textContent = `LOAD: ${(p.progress * 100).toFixed(0)}%`;
+                }
+            });
 
-            if (!ffmpegCoreAPI) {
-                ffmpegCoreAPI = await loadFFmpegCoreAPI({
-                    coreURL: FFMPEG_CORE_URL,
-                    wasmURL: FFMPEG_WASM_URL,
-                    onLog: (l) => appendLog(l.message),
-                    onProgress: (p) => {
-                        document.getElementById('progress').textContent = `Progress: ${(p.progress * 100).toFixed(1)}%`;
-                    }
-                });
+            isCoreLoaded = true;
+            dom.progress.textContent = "READY";
+            appendLog("Core loaded successfully.", "success");
+            if (directoryHandle) dom.start.disabled = false;
+        } catch (err) {
+            appendLog(`Core Init Failed: ${err.message}`, "error");
+            dom.progress.textContent = "CORE_ERR";
+        }
+    })();
+
+    dom.auth.onclick = async () => {
+        try {
+            directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+            dom.status.textContent = `ONLINE / ${directoryHandle.name.toUpperCase()}`;
+            dom.status.style.color = "var(--cmd-text)";
+            if (isCoreLoaded) dom.start.disabled = false;
+            appendLog(`Directory "${directoryHandle.name}" mounted.`);
+        } catch (err) {
+            appendLog("Mount failed.", "error");
+        }
+    };
+
+    dom.start.onclick = async () => {
+        const cmdValue = dom.cmd.value.trim();
+        if (!cmdValue || !directoryHandle || !isCoreLoaded) return;
+
+        dom.start.disabled = true;
+        try {
+            const currentFS = await ffmpegCoreAPI("FS.readdir", ["/"]);
+            for (const f of currentFS) {
+                if (!["current_dir", ".", "..", "tmp", "dev", "proc"].includes(f)) {
+                    try { await ffmpegCoreAPI("FS.unlink", [f]); } catch(e) {}
+                }
             }
 
             const args = parseCommand(cmdValue);
-            
             for (const arg of args) {
                 if (arg.includes('.') && !arg.startsWith('-')) {
                     try {
-                        const fileHandle = await dirHandle.getFileHandle(arg);
+                        const fileHandle = await directoryHandle.getFileHandle(arg);
                         const file = await fileHandle.getFile();
                         const buffer = await file.arrayBuffer();
                         await ffmpegCoreAPI("FS.writeFile", [arg, new Uint8Array(buffer)]);
-                        appendLog(`File Mounted: ${arg}`);
+                        appendLog(`Syncing: ${arg}`);
                     } catch (e) {
-                        // Probably the output filename
+                        if (arg === args[args.length - 1]) continue;
+                        appendLog(`Warning: File "${arg}" not found in directory.`, "error");
                     }
                 }
             }
 
-            document.getElementById('progress').textContent = "Processing...";
+            dom.progress.textContent = "PROCESSING";
             await ffmpegCoreAPI("setTimeout", [-1]);
-            await ffmpegCoreAPI("exec", args);
-            
-            const result = await ffmpegCoreAPI("ret");
-            if (result === 0) {
-                document.getElementById('progress').textContent = "Saving to Disk";
-                const fsFiles = await ffmpegCoreAPI("FS.readdir", ["/"]);
-                
-                for (const f of fsFiles) {
-                    if (["current_dir", ".", "..", "tmp", "dev", "proc"].includes(f)) continue;
-                    
-                    const isInput = args.some((arg, i) => arg === f && (i === 0 || args[i-1] === '-i'));
-                    
-                    if (!isInput) {
-                        try {
-                            const data = await ffmpegCoreAPI("FS.readFile", [f]);
-                            const newFileHandle = await dirHandle.getFileHandle(f, { create: true });
-                            const writable = await newFileHandle.createWritable();
-                            await writable.write(data.buffer);
-                            await writable.close();
-                            appendLog(`Successfully Saved: ${f}`, 'success');
-                            await ffmpegCoreAPI("FS.unlink", [f]);
-                        } catch (e) {
-                            console.log(`Skipping system object: ${f}`);
-                        }
-                    }
+
+            try {
+                await ffmpegCoreAPI("exec", args);
+            } catch (execErr) {
+                if (execErr.message.includes("Aborted") || execErr.message.includes("undefined")) {
+                    appendLog("Process exit signal captured.");
+                } else {
+                    throw execErr;
                 }
-                document.getElementById('progress').textContent = "Finished";
-                appendLog("Transcoding complete.", 'success');
-            } else {
-                document.getElementById('progress').textContent = "Failed";
-                appendLog(`Error during transcoding. Code: ${result}`, 'error');
             }
             
-            await ffmpegCoreAPI("reset");
+            dom.progress.textContent = "SYNCING";
+            const fsFiles = await ffmpegCoreAPI("FS.readdir", ["/"]);
+            let savedCount = 0;
+
+            for (const f of fsFiles) {
+                if (["current_dir", ".", "..", "tmp", "dev", "proc"].includes(f)) continue;
+                const isInput = args.some((arg, i) => arg === f && (i === 0 || args[i-1] === '-i'));
+                
+                if (!isInput) {
+                    try {
+                        const data = await ffmpegCoreAPI("FS.readFile", [f]);
+                        const newFileHandle = await directoryHandle.getFileHandle(f, { create: true });
+                        const writable = await newFileHandle.createWritable();
+                        await writable.write(data.buffer);
+                        await writable.close();
+                        appendLog(`Saved: ${f}`, "success");
+                        await ffmpegCoreAPI("FS.unlink", [f]);
+                        savedCount++;
+                    } catch (e) {}
+                }
+            }
+
+            dom.progress.textContent = savedCount > 0 ? "FINISHED" : "NO_OUTPUT";
 
         } catch (err) {
-            appendLog(`System Error: ${err.message}`, 'error');
-            document.getElementById('progress').textContent = "Stopped";
+            appendLog(`Error: ${err.message}`, "error");
+            dom.progress.textContent = "ERROR";
+        } finally {
+            try { await ffmpegCoreAPI("reset"); } catch(e) {}
+            dom.start.disabled = false;
         }
     };
 </script>
